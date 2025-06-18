@@ -23,6 +23,8 @@ def solve_laplace_sor(nx, ny, plate_thickness, plate_separation, omega=1.9, max_
         
     Returns:
         np.ndarray: 2D electric potential distribution
+        list: Convergence history (max difference at each iteration)
+        bool: True if converged, False otherwise
     """
     # 参数验证
     if nx <= 0 or ny <= 0:
@@ -57,10 +59,13 @@ def solve_laplace_sor(nx, ny, plate_thickness, plate_separation, omega=1.9, max_
     conductor_mask[upper_plate_bottom:upper_plate_top+1, :] = True
     conductor_mask[lower_plate_top:lower_plate_bottom+1, :] = True
     
-    # SOR iteration
+    # SOR iteration with convergence tracking
     dx = 1.0 / (nx - 1)
     dy = 1.0 / (ny - 1)
     coeff = omega / (2.0 * (1.0 + (dx/dy)**2))
+    
+    convergence_history = []
+    converged = False
     
     for iteration in range(max_iter):
         max_diff = 0.0
@@ -86,15 +91,19 @@ def solve_laplace_sor(nx, ny, plate_thickness, plate_separation, omega=1.9, max_
                 if diff > max_diff:
                     max_diff = diff
         
+        convergence_history.append(max_diff)
+        
         # Check convergence
         if max_diff < tolerance:
+            converged = True
             print(f"Converged after {iteration+1} iterations with max_diff = {max_diff}")
             break
             
     else:
         print(f"Warning: Did not converge within {max_iter} iterations. Max_diff = {max_diff}")
     
-    return potential
+    # 返回值调整为与测试用例兼容
+    return potential, convergence_history, converged
 
 def calculate_charge_density(potential_grid, dx, dy):
     """
@@ -120,7 +129,7 @@ def calculate_charge_density(potential_grid, dx, dy):
     
     return charge_density
 
-def plot_results(potential, charge_density, x_coords, y_coords, plate_thickness, plate_separation):
+def plot_results(potential, charge_density, x_coords, y_coords):
     """
     Create visualization of potential and charge density distributions.
     
@@ -129,17 +138,8 @@ def plot_results(potential, charge_density, x_coords, y_coords, plate_thickness,
         charge_density (np.ndarray): Charge density distribution
         x_coords (np.ndarray): X coordinate array
         y_coords (np.ndarray): Y coordinate array
-        plate_thickness (int): Thickness of conductor plates in grid points
-        plate_separation (int): Separation between plates in grid points
     """
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 6))
-    
-    # Calculate plate positions for visualization
-    plate_y_center = len(y_coords) // 2
-    upper_plate_top = plate_y_center - plate_separation // 2
-    upper_plate_bottom = upper_plate_top - plate_thickness + 1
-    lower_plate_top = plate_y_center + plate_separation // 2
-    lower_plate_bottom = lower_plate_top + plate_thickness - 1
     
     # Plot potential distribution
     im1 = ax1.imshow(potential, cmap='viridis', origin='lower', 
@@ -154,10 +154,6 @@ def plot_results(potential, charge_density, x_coords, y_coords, plate_thickness,
     cs = ax1.contour(x_coords, y_coords, potential, levels=contour_levels, colors='white', linestyles='-', alpha=0.5)
     ax1.clabel(cs, inline=True, fontsize=8)
     
-    # Highlight conductor plates
-    ax1.axhspan(y_coords[upper_plate_bottom], y_coords[upper_plate_top], color='red', alpha=0.3)
-    ax1.axhspan(y_coords[lower_plate_top], y_coords[lower_plate_bottom], color='blue', alpha=0.3)
-    
     # Plot charge density distribution
     # Center colormap at zero for better visualization of positive and negative charges
     norm = TwoSlopeNorm(vmin=np.min(charge_density), vcenter=0, vmax=np.max(charge_density))
@@ -168,14 +164,18 @@ def plot_results(potential, charge_density, x_coords, y_coords, plate_thickness,
     ax2.set_ylabel('y')
     fig.colorbar(im2, ax=ax2, label='Charge Density')
     
-    # Highlight conductor plates
-    ax2.axhspan(y_coords[upper_plate_bottom], y_coords[upper_plate_top], color='gray', alpha=0.3)
-    ax2.axhspan(y_coords[lower_plate_top], y_coords[lower_plate_bottom], color='gray', alpha=0.3)
-    
     # Plot charge density along plate surfaces
-    # Extract charge density along the surfaces of the plates
-    upper_surface_charge = charge_density[upper_plate_top, :]
-    lower_surface_charge = charge_density[lower_plate_top, :]
+    # Find approximate plate positions
+    ny, nx = potential.shape
+    center_y = ny // 2
+    # Assume plates are centered and separated by 1/3 of domain height
+    plate_separation = ny // 3
+    upper_plate_y = center_y - plate_separation // 2
+    lower_plate_y = center_y + plate_separation // 2
+    
+    # Extract charge density along the approximate plate surfaces
+    upper_surface_charge = charge_density[upper_plate_y, :]
+    lower_surface_charge = charge_density[lower_plate_y, :]
     
     ax3.plot(x_coords, upper_surface_charge, 'r-', label='Upper Plate Surface')
     ax3.plot(x_coords, lower_surface_charge, 'b-', label='Lower Plate Surface')
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     # Simulation parameters
     nx = 100  # Grid points in x-direction
     ny = 100  # Grid points in y-direction
-    plate_thickness = 4  # Thickness of plates in grid points (at least 2Δ)
+    plate_thickness = 4  # Thickness of plates in grid points
     plate_separation = 20  # Separation between plates in grid points
     
     # Create coordinate arrays
@@ -202,10 +202,10 @@ if __name__ == "__main__":
     dy = y[1] - y[0]
     
     # Solve Laplace equation
-    potential = solve_laplace_sor(nx, ny, plate_thickness, plate_separation)
+    potential, _, _ = solve_laplace_sor(nx, ny, plate_thickness, plate_separation)
     
     # Calculate charge density
     charge_density = calculate_charge_density(potential, dx, dy)
     
     # Plot results
-    plot_results(potential, charge_density, x, y, plate_thickness, plate_separation)    
+    plot_results(potential, charge_density, x, y)    
