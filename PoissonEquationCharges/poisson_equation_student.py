@@ -34,25 +34,20 @@ def solve_poisson_equation(M: int = 100, target: float = 1e-6, max_iterations: i
     # 创建电荷密度数组
     rho = np.zeros((M+1, M+1), dtype=float)
     
-    # 设置电荷分布 - 修正：严格按照题目要求的坐标系统
-    # 正电荷：rho[60:80, 20:40] = 1.0  # 注意：这里是x范围在前，y范围在后
-    # 负电荷：rho[20:40, 60:80] = -1.0
-    # 但是在数组索引中，第一个维度是行(y)，第二个维度是列(x)
-    # 所以需要转换为：rho[y范围, x范围]
+    # 设置电荷分布 - 修正：严格按照题目要求的坐标系统和测试用例的缩放逻辑
+    # 注意：测试用例中对于M=50的情况，正电荷区域是phi[30:40, 10:20]
+    # 因此需要使用int(0.6*M):int(0.8*M)这样的缩放方式
+    pos_x_start = int(0.2 * M)
+    pos_x_end = int(0.4 * M)
+    pos_y_start = int(0.6 * M)
+    pos_y_end = int(0.8 * M)
     
-    # 注意：对于小网格测试，需要正确缩放
-    # 例如，当M=20时，60%的M是12，80%的M是16
-    pos_y_start = int(60 * M / 100)
-    pos_y_end = int(80 * M / 100)
-    pos_x_start = int(20 * M / 100)
-    pos_x_end = int(40 * M / 100)
+    neg_x_start = int(0.6 * M)
+    neg_x_end = int(0.8 * M)
+    neg_y_start = int(0.2 * M)
+    neg_y_end = int(0.4 * M)
     
-    neg_y_start = int(20 * M / 100)
-    neg_y_end = int(40 * M / 100)
-    neg_x_start = int(60 * M / 100)
-    neg_x_end = int(80 * M / 100)
-    
-    # 修正：使用正确的数组索引顺序 [y范围, x范围]
+    # 设置电荷密度
     rho[pos_y_start:pos_y_end, pos_x_start:pos_x_end] = 1.0   # 正电荷
     rho[neg_y_start:neg_y_end, neg_x_start:neg_x_end] = -1.0  # 负电荷
     
@@ -64,16 +59,14 @@ def solve_poisson_equation(M: int = 100, target: float = 1e-6, max_iterations: i
     # 主迭代循环
     while delta > target and iterations < max_iterations:
         # 使用有限差分公式更新内部网格点
-        # 修正：使用phi_prev来更新phi，确保每次迭代使用的是上一次的结果
+        # 修正：确保在更新过程中不覆盖用于计算的值
+        phi_prev = np.copy(phi)  # 在更新前保存旧值
         phi[1:-1, 1:-1] = 0.25 * (phi_prev[0:-2, 1:-1] + phi_prev[2:, 1:-1] + 
                                   phi_prev[1:-1, :-2] + phi_prev[1:-1, 2:] + 
                                   h*h * rho[1:-1, 1:-1])
         
         # 计算最大变化量
         delta = np.max(np.abs(phi - phi_prev))
-        
-        # 更新前一步解
-        phi_prev = np.copy(phi)
         
         # 增加迭代计数
         iterations += 1
@@ -107,20 +100,25 @@ def visualize_solution(phi: np.ndarray, M: int = 100) -> None:
     cbar = plt.colorbar(im)
     cbar.set_label('Electric Potential (V)', fontsize=12)
     
-    # 标注电荷位置 - 修正：使用正确的坐标系统
-    # 注意：plt.fill_between使用的是(x, y)顺序，而不是数组索引顺序
-    pos_x1, pos_x2 = int(20 * M / 100), int(40 * M / 100)
-    pos_y1, pos_y2 = int(60 * M / 100), int(80 * M / 100)
+    # 标注电荷位置 - 修正：与求解函数中的电荷位置保持一致
+    pos_x_start = int(0.2 * M)
+    pos_x_end = int(0.4 * M)
+    pos_y_start = int(0.6 * M)
+    pos_y_end = int(0.8 * M)
     
-    neg_x1, neg_x2 = int(60 * M / 100), int(80 * M / 100)
-    neg_y1, neg_y2 = int(20 * M / 100), int(40 * M / 100)
+    neg_x_start = int(0.6 * M)
+    neg_x_end = int(0.8 * M)
+    neg_y_start = int(0.2 * M)
+    neg_y_end = int(0.4 * M)
     
-    plt.fill_between([pos_x1, pos_x2, pos_x2, pos_x1, pos_x1],
-                    [pos_y1, pos_y1, pos_y2, pos_y2, pos_y1],
+    # 绘制正电荷区域
+    plt.fill_between([pos_x_start, pos_x_end, pos_x_end, pos_x_start, pos_x_start],
+                    [pos_y_start, pos_y_start, pos_y_end, pos_y_end, pos_y_start],
                     alpha=0.3, color='red', label='Positive Charge')
     
-    plt.fill_between([neg_x1, neg_x2, neg_x2, neg_x1, neg_x1],
-                    [neg_y1, neg_y1, neg_y2, neg_y2, neg_y1],
+    # 绘制负电荷区域
+    plt.fill_between([neg_x_start, neg_x_end, neg_x_end, neg_x_start, neg_x_start],
+                    [neg_y_start, neg_y_start, neg_y_end, neg_y_end, neg_y_start],
                     alpha=0.3, color='blue', label='Negative Charge')
     
     # 添加标题和标签
