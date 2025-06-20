@@ -1,8 +1,3 @@
-"""
-学生模板：松弛迭代法解常微分方程
-文件：relaxation_method_student.py
-重要：函数名称必须与参考答案一致！
-"""
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -32,17 +27,26 @@ def solve_ode(h, g, max_iter=10000, tol=1e-6):
     t = np.arange(0, 10 + h, h)
     
     # 初始化解数组，边界条件已满足：x[0] = x[-1] = 0
-    x = np.zeros(t.size)
+    x = np.zeros_like(t)
     
-    # TODO: 实现松弛迭代算法
-    # 提示：
-    # 1. 设置初始变化量 delta = 1.0
-    # 2. 当 delta > tol 时继续迭代
-    # 3. 对内部点应用公式：x_new[1:-1] = 0.5 * (h*h*g + x[2:] + x[:-2])
-    # 4. 计算最大变化量：delta = np.max(np.abs(x_new - x))
-    # 5. 更新解：x = x_new
+    # 实现松弛迭代算法
+    delta = 1.0
+    iter_count = 0
     
-    raise NotImplementedError(f"请在 {__file__} 中实现此函数")
+    while delta > tol and iter_count < max_iter:
+        x_new = np.copy(x)
+        # 应用迭代公式更新内部点
+        x_new[1:-1] = 0.5 * (h*h*g + x[2:] + x[:-2])
+        # 计算最大绝对误差
+        delta = np.max(np.abs(x_new - x))
+        # 更新解
+        x = x_new
+        iter_count += 1
+    
+    if iter_count >= max_iter:
+        print(f"警告：达到最大迭代次数 {max_iter}，当前误差为 {delta}")
+    
+    return t, x
 
 if __name__ == "__main__":
     # 测试参数
@@ -57,5 +61,5 @@ if __name__ == "__main__":
     plt.xlabel('时间 (s)')
     plt.ylabel('高度 (m)')
     plt.title('抛体运动轨迹 (松弛迭代法)')
-    plt.grid()
-    plt.show()
+    plt.grid(True)
+    plt.show()    
